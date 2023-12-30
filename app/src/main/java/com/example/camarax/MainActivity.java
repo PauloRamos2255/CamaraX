@@ -16,7 +16,9 @@ import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.ExifInterface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
@@ -25,6 +27,7 @@ import android.widget.Toast;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 
@@ -118,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public  void  takePicture(ImageCapture imageCapture){
+    public void takePicture(ImageCapture imageCapture) {
         File file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
         ImageCapture.OutputFileOptions outputFileOptions = new ImageCapture.OutputFileOptions.Builder(file).build();
         imageCapture.takePicture(outputFileOptions, Executors.newCachedThreadPool(), new ImageCapture.OnImageSavedCallback() {
@@ -127,25 +130,33 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(MainActivity.this, "Image saved at : "+ file.getPath(), Toast.LENGTH_SHORT).show();
+                        // Aquí se inicia la nueva actividad y se pasa la ruta de la imagen capturada como argumento
+                        Intent intent = new Intent(MainActivity.this, MainActivity2.class);
+                        intent.putExtra("imagePath", file.getPath());
+
+                        // Obtener la orientación de la imagen y pasarla a la actividad
+                        int rotation = getRotationFromImage(file);
+                        intent.putExtra("imageRotation", rotation);
+
+                        startActivity(intent);
                     }
                 });
-                startCamera(cameraFacing);
             }
 
             @Override
             public void onError(@NonNull ImageCaptureException exception) {
-               runOnUiThread(new Runnable() {
-                   @Override
-                   public void run() {
-                       Toast.makeText(MainActivity.this, "Falled to save : "+ exception.getMessage(), Toast.LENGTH_SHORT).show();
-                       startCamera(cameraFacing);
-                   }
-               });
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "Failed to save : " + exception.getMessage(), Toast.LENGTH_SHORT).show();
+                        // Puedes decidir si reiniciar la cámara en caso de error
+                        startCamera(cameraFacing);
+                    }
+                });
             }
         });
-
     }
+
 
 
     private void setFlashIcon(Camera camera){
@@ -176,6 +187,28 @@ public class MainActivity extends AppCompatActivity {
         }
         return AspectRatio.RATIO_16_9;
 
+    }
+
+
+    private int getRotationFromImage(File imageFile) {
+        try {
+            ExifInterface exifInterface = new ExifInterface(imageFile.getAbsolutePath());
+            int orientation = exifInterface.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED);
+
+            switch (orientation) {
+                case ExifInterface.ORIENTATION_ROTATE_90:
+                    return 90;
+                case ExifInterface.ORIENTATION_ROTATE_180:
+                    return 180;
+                case ExifInterface.ORIENTATION_ROTATE_270:
+                    return 270;
+                default:
+                    return 0;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return 0;
+        }
     }
 
 }
